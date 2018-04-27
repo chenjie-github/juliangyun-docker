@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context" xmlns:p="http://www.springframework.org/schema/p"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                            http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+                            http://www.springframework.org/schema/context
+                            http://www.springframework.org/schema/context/spring-context-3.2.xsd">
+
+    <!-- 引入jedis配置文件 -->
+    <context:property-placeholder location="classpath:config/redis.properties" ignore-unresolvable="true" />
+
+    <bean id="jedisPoolConfig" class="redis.clients.jedis.JedisPoolConfig">
+        <property name="maxTotal" value="${redis.pool.maxActive}" />
+        <property name="maxIdle" value="${redis.pool.maxIdle}" />
+        <property name="maxWaitMillis" value="${redis.pool.maxWaitMillis}" />
+        <property name="testOnBorrow" value="${redis.pool.testOnBorrow}"/>
+        <property name="testOnReturn" value="${redis.pool.testOnReturn}"/>
+    </bean>
+
+    <bean id="jedisPool" class="redis.clients.jedis.JedisPool">
+        <!-- 连接池的配置 -->
+        <constructor-arg index="0" ref="jedisPoolConfig" />
+        <!-- 连接的配置 -->
+        <constructor-arg index="1"><value type="java.lang.String">${redis.host}</value></constructor-arg>
+        <constructor-arg index="2"><value type="java.lang.Integer">${redis.port}</value></constructor-arg>
+        <constructor-arg index="3"><value type="java.lang.Integer">${redis.timeout}</value></constructor-arg>
+        <constructor-arg index="4"><value type="java.lang.String">${redis.password}</value></constructor-arg>
+        <constructor-arg index="5"><value type="java.lang.Integer">${redis.database}</value></constructor-arg>
+    </bean>
+
+    <bean id="jedisDataSource" class="cog.support.cache.redis.JedisDataSource">
+        <property name="jedisPool" ref="jedisPool"/>
+    </bean>
+
+
+
+
+    <!-- 引入jedis配置文件 -->
+    <context:property-placeholder location="classpath:config/redis-validate.properties" ignore-unresolvable="true" />
+
+    <bean id="jedisPoolConfigValidate" class="redis.clients.jedis.JedisPoolConfig">
+        <property name="maxTotal" value="${validate.redis.pool.maxActive}" />
+        <property name="maxIdle" value="${validate.redis.pool.maxIdle}" />
+        <property name="maxWaitMillis" value="${validate.redis.pool.maxWaitMillis}" />
+        <property name="testOnBorrow" value="${validate.redis.pool.testOnBorrow}"/>
+        <property name="testOnReturn" value="${validate.redis.pool.testOnReturn}"/>
+    </bean>
+
+    <bean id="jedisPoolValidate" class="redis.clients.jedis.JedisPool" >
+        <!-- 连接池的配置 -->
+        <constructor-arg index="0" ref="jedisPoolConfigValidate" />
+        <!-- 连接的配置 -->
+        <constructor-arg index="1"><value type="java.lang.String">${validate.redis.host}</value></constructor-arg>
+        <constructor-arg index="2"><value type="java.lang.Integer">${validate.redis.port}</value></constructor-arg>
+        <constructor-arg index="3"><value type="java.lang.Integer">${validate.redis.timeout}</value></constructor-arg>
+        <constructor-arg index="4"><value type="java.lang.String">${validate.redis.password}</value></constructor-arg>
+        <constructor-arg index="5"><value type="java.lang.Integer">${validate.redis.database}</value></constructor-arg>
+    </bean>
+
+    <bean id="jedisDataSourceValidate" class="cog.support.cache.redis.JedisDataSource">
+        <property name="jedisPool" ref="jedisPoolValidate"/>
+    </bean>
+
+
+
+
+    <!-- ehcache管理器 -->
+    <bean id="ehcacheManager" class="cog.support.cache.ehcache.EhcacheManager" />
+
+    <!-- redis管理器 -->
+    <bean id="iCacheServices" class="cog.support.cache.redis.api.CacheServicesForRedis" />
+
+    <!-- 发送统计 -->
+    <bean id="smsStatistics" class="cog.bengxiao.business.cache.statistics.SmsStatistics" />
+
+    <bean id="iSmsSendJobProgress" class="cog.bengxiao.business.cache.services.imple.SmsSendJobProgress">
+        <property name="jedisDataSource" ref="jedisDataSource" />
+    </bean>
+</beans>

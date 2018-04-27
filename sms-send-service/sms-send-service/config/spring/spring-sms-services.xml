@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+						   http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+						   http://www.springframework.org/schema/context
+						   http://www.springframework.org/schema/context/spring-context.xsd
+						   http://www.springframework.org/schema/rabbit
+						   http://www.springframework.org/schema/rabbit/spring-rabbit.xsd http://code.alibabatech.com/schema/dubbo http://code.alibabatech.com/schema/dubbo/dubbo.xsd">
+
+    <context:property-placeholder location="classpath:config/zk-client.properties" ignore-unresolvable="true"/>
+    <context:property-placeholder location="classpath:config/rabbit-mq.properties" ignore-unresolvable="true"/>
+
+
+    <!-- BeanUtils，针对于Java8的时间相关的转化器 -->
+    <bean class="cog.support.util.serializable.util.LocalDateConverter"         init-method="registerConvertUtils"/>
+
+    <!--
+        验证策略配置
+    -->
+    <!-- 通道签名分配策略 -->
+    <bean id="channelSginPreparationStrategy"   class="com.wzy.sms.services.send.services.strategy.imple.SmsChannelSginPreparationStrategy" />
+    <!-- 通道分配策略 -->
+    <bean id="channeAssignlStrategy"   class="com.wzy.sms.services.send.services.strategy.imple.SmsChannelAssignStrategy" />
+    <!-- 关键字验证服务 -->
+    <bean id="contentTempletStrategy"  class="com.wzy.sms.services.send.services.strategy.imple.SmsContentTempletStrategy" />
+    <!-- 手机号码拦截服务 -->
+    <bean id="mobileInterceptStrategy" class="com.wzy.sms.services.send.services.strategy.imple.SmsMobileInterceptStrategy" />
+    <!-- 屏蔽词筛选服务 -->
+    <bean id="screeningWordsStrategy"  class="com.wzy.sms.services.send.services.strategy.imple.SmsScreeningWordsStrategy" />
+    <!-- 运营商配置服务 -->
+    <bean id="sectionConfigStrategy"   class="com.wzy.sms.services.send.services.strategy.imple.SmsSectionConfigStrategy" />
+    <!-- 手机号码区域获取 -->
+    <bean id="smsMobileAreaStrategy"   class="com.wzy.sms.services.send.services.strategy.imple.SmsMobileAreaStrategy" />
+    <!-- 智能通道跳转 -->
+    <bean id="smsChannelIntelligentSkipStrategy"   class="com.wzy.sms.services.send.services.strategy.imple.SmsChannelIntelligentSkipStrategy" />
+
+    <!--
+        短信发送相关的各种处理器
+    -->
+    <!-- 验证处理 -->
+    <bean id="stategyValidate" class="com.wzy.sms.services.send.services.action.SmsStategyValidate">
+        <!-- 具体验证服务配置 -->
+        <property name="channeAssignlStrategy"   ref="channeAssignlStrategy" />
+        <property name="smsMobileAreaStrategy"   ref="smsMobileAreaStrategy"/>
+        <property name="contentTempletStrategy"  ref="contentTempletStrategy"/>
+        <property name="mobileInterceptStrategy" ref="mobileInterceptStrategy"/>
+        <property name="screeningWordsStrategy"  ref="screeningWordsStrategy"/>
+        <property name="sectionConfigStrategy"   ref="sectionConfigStrategy"/>
+        <property name="channelSginPreparationStrategy" ref="channelSginPreparationStrategy"/>
+        <property name="smsChannelIntelligentSkipStrategy"   ref="smsChannelIntelligentSkipStrategy"/>
+    </bean>
+
+    <!-- 通道队列推送 -->
+    <!-- 通道过滤器 -->
+    <bean id="channelContentMinCountFilter" class="com.wzy.sms.services.send.services.channel.imple.ChannelContentMinSendCountFilter" />
+    <bean id="channelMobileMaxCountFilter" class="com.wzy.sms.services.send.services.channel.imple.ChannelMobileMaxSendCountFilter" />
+
+    <!-- 通道数据推送处理器 -->
+    <bean id="smsPushChannelQueue" class="com.wzy.sms.services.send.services.action.SmsPushChannelQueue">
+        <property name="channelContentMinCountFilter" ref="channelContentMinCountFilter" />
+        <property name="channelMobileMaxCountFilter" ref="channelMobileMaxCountFilter" />
+
+        <!-- 实时缓存更新配置 -->
+        <property name="handleName" value="SmsChannelFilterCache" />
+        <property name="channel" value="SmsChannelFilter"/>
+    </bean>
+
+    <!-- 缓存更新频道订阅 -->
+    <bean id="cacheSubscribe" class="cog.support.cache.redis.message.RedisSubscribeManager" init-method="loadChannel">
+        <property name="channelList">
+            <list>
+                <ref bean="channelSginPreparationStrategy"/>
+                <ref bean="channeAssignlStrategy"/>
+                <ref bean="contentTempletStrategy"/>
+                <ref bean="mobileInterceptStrategy"/>
+                <ref bean="screeningWordsStrategy"/>
+                <ref bean="sectionConfigStrategy"/>
+                <ref bean="smsMobileAreaStrategy"/>
+                <ref bean="smsChannelIntelligentSkipStrategy"/>
+                <ref bean="smsPushChannelQueue"/>
+            </list>
+        </property>
+    </bean>
+
+    <!-- zk客户端 -->
+    <bean id="curatorClient" class="cog.support.alibaba.zookeeper.CuratorClient" >
+        <constructor-arg index="0" value="${zk.ip}:${zk.port}" />
+        <constructor-arg index="1" value="juliang"/>
+    </bean>
+
+    <!-- rabbitmq 连接管理器 -->
+    <bean id="tf" class="org.springframework.scheduling.concurrent.CustomizableThreadFactory">
+        <constructor-arg  value="rabbitmq-"/>
+    </bean>
+    <rabbit:connection-factory id="connectionFactory"  thread-factory="tf"  channel-cache-size ="10"
+                               host="${rabbitmq.host}"
+                               username="${rabbitmq.username}"
+                               password="${rabbitmq.password}"
+                               port="${rabbitmq.port}"/>
+
+    <!-- 消息对象json转换类 -->
+    <bean id="jsonMessageConverter" class="org.springframework.amqp.support.converter.Jackson2JsonMessageConverter" />
+
+    <rabbit:template  id="amqpTemplate"  connection-factory="connectionFactory" message-converter="jsonMessageConverter"/>
+
+    <rabbit:admin connection-factory="connectionFactory"/>
+
+
+
+
+    <!-- 短信发送提交队列 -->
+    <rabbit:queue name="sms.send.submit" />
+
+    <!-- 定义队列的发送类 -->
+    <bean id="smsSubmitQueueServices" class="com.wzy.sms.services.send.queue.rabbitmq.SmsSubmitQueueServicesImpleRabbitMQ">
+        <property name="smsSubmitQueue" value="sms.send.submit" />
+    </bean>
+
+    <!-- 定义监听队列的处理类 -->
+    <bean id="smsSendSubmitProcessor" class="com.wzy.sms.services.send.processor.SmsSubmitProcessor" init-method="init" destroy-method="destroy">
+        <!-- maximumPoolSize -->
+        <constructor-arg index="0" value="${SmsSubmitProcessor.ThreadPool.maximumPoolSize}" />
+        <!-- corePoolSize -->
+        <constructor-arg index="1" value="${SmsSubmitProcessor.ThreadPool.corePoolSize}" />
+    </bean>
+
+    <rabbit:listener-container connection-factory="connectionFactory" acknowledge="manual" prefetch="${SmsSubmitProcessor.rabbitmq.prefetch}" >
+        <rabbit:listener ref="smsSendSubmitProcessor" queue-names="sms.send.submit" />
+    </rabbit:listener-container>
+
+
+
+
+
+    <rabbit:queue name="sms.examine" />
+
+    <!-- 定义队列的发送类 -->
+    <bean id="smsExamineQueueServicesImpleRabbitMQ" class="com.wzy.sms.services.send.queue.rabbitmq.SmsExamineQueueServicesImpleRabbitMQ">
+        <property name="smsExamineQueue" value="sms.examine" />
+    </bean>
+
+    <!-- 定义监听队列的处理类 -->
+    <bean id="smsExamineProcessor" class="com.wzy.sms.services.send.processor.SmsExamineProcessor">
+        <!-- maximumPoolSize -->
+        <constructor-arg index="0" value="${SmsExamineQueue.ThreadPool.maximumPoolSize}" />
+        <!-- corePoolSize -->
+        <constructor-arg index="1" value="${SmsExamineQueue.ThreadPool.corePoolSize}" />
+    </bean>
+
+    <rabbit:listener-container connection-factory="connectionFactory" acknowledge="manual" prefetch="${SmsExamineQueue.ThreadPool.prefetch}" >
+        <rabbit:listener ref="smsExamineProcessor" queue-names="sms.examine" />
+    </rabbit:listener-container>
+
+</beans>
