@@ -2,8 +2,10 @@
 <configuration debug="false">
 
     <!-- 定义日志的根目录 -->
-    <property name="APPLICATION" value="sms-send-service-1-1" />
-    <property name="LOG_HOME" value="../flogs/%d{yyyy-MM-dd}/" />
+    <property name="LOG_HOME" value="/log/flogs/%d{yyyy-MM-dd}/" />
+
+     <!-- 定义日志的根目录 -->
+    <property name="APPLICATION" value="sms-send-service-3-1" />
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder"> 
@@ -36,10 +38,10 @@
         <appender-ref ref ="SEND-FILE-LOG"/>
     </appender>
 
-
-    <logger name="SEND-ASYNC-LOGGER"      level="INFO" additivity="true">
+    <logger name="SEND-ASYNC-LOGGER" level="INFO" additivity="false">
         <appender-ref ref="SEND-ASYNC" />
     </logger>
+
     <root level="INFO">
         <appender-ref ref="STDOUT" />
     </root>
